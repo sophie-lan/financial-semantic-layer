@@ -53,6 +53,16 @@ async def fetch_all_forwards() -> list[dict]:
     return [dict(row) for row in rows]
 
 
+async def fetch_forward_by_id(trade_id: str) -> dict | None:
+    """Return a single row by trade_id using WHERE clause — no full table scan."""
+    conn = await _get_conn()
+    async with conn.execute(
+        "SELECT * FROM fx_forwards WHERE trade_id = ?", (trade_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    return dict(row) if row else None
+
+
 async def reset_db() -> None:
     """Drop and re-seed the DB (used in tests to get a fresh state)."""
     global _CONN

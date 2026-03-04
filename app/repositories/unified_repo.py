@@ -1,10 +1,13 @@
 """UnifiedTradeRepository: fans out to both repos concurrently."""
 import asyncio
+import logging
 from typing import Literal
 
 from app.models import Trade
 from app.repositories.forward_repo import ForwardSQLRepository
 from app.repositories.option_repo import OptionNoSQLRepository
+
+logger = logging.getLogger(__name__)
 
 TradeTypeFilter = Literal["forward", "option"] | None
 
@@ -35,4 +38,9 @@ class UnifiedTradeRepository:
             self._forwards.get_by_id(trade_id),
             self._options.get_by_id(trade_id),
         )
-        return forward or option
+        # If trade_id naming conventions (e.g. FWD- / OPT- prefix) are enforced
+        # upstream, we could route directly to one source instead of querying both.
+        results = [r for r in (forward, option) if r is not None]
+        if len(results) > 1:
+            logger.warning("trade_id=%s found in multiple sources", trade_id)
+        return results[0] if results else None

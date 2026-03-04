@@ -6,6 +6,7 @@ Coercions performed here (not in the model — strict=True forbids silent coerci
   - premium: missing key → default 0.0
   - expiry: ISO string → date
 """
+import logging
 from datetime import date
 
 from pydantic import ValidationError
@@ -14,6 +15,8 @@ from app.models.common import Party
 from app.models.fx_option import FXOption, OptionType
 from app.repositories.base import TradeRepository
 from app.sources.nosql_source import fetch_all_options
+
+logger = logging.getLogger(__name__)
 
 
 def _doc_to_option(doc: dict) -> FXOption:
@@ -41,10 +44,12 @@ class OptionNoSQLRepository(TradeRepository):
         for doc in docs:
             try:
                 results.append(_doc_to_option(doc))
-            except (ValidationError, ValueError):
-                # Bad records are silently skipped here;
-                # Phase 5 adds a proper governance layer on top.
-                pass
+            except (ValidationError, ValueError) as e:
+                logger.warning(
+                    "Skipping invalid option doc trade_id=%s: %s",
+                    doc.get("trade_id", "?"),
+                    e,
+                )
         return results
 
     async def get_by_id(self, trade_id: str) -> FXOption | None:
